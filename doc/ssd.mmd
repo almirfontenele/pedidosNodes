@@ -1,0 +1,35 @@
+
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    actor G as Gestor de Operações
+    participant S as Sistema (Orders-Service)
+
+    Note over C, S: Fluxo de Criação de Pedido (RF01, RF02)
+    C->>S: criarPedido(itens, frete)
+    alt Estoque disponível
+        S-->>S: validarEstoque(itens)
+        S-->>S: reservarEstoque(itens)
+        S-->>S: calcularTotal(itens, frete)
+        S-->>C: confirmaçãoPedido(id, status: "PENDENTE", total)
+    else Estoque insuficiente
+        S-->>C: erro("Estoque insuficiente")
+    end
+
+    Note over C, S: Fluxo de Cancelamento (RF02, RF03)
+    C->>S: cancelarPedido(id)
+    alt Pedido não pago (Status: "PENDENTE")
+        S-->>S: devolverEstoque(itens)
+        S-->>S: atualizarStatus(id, "CANCELADO")
+        S-->>C: pedidoCancelado(id)
+    else Pedido já enviado/pago
+        S-->>C: erro("Cancelamento não permitido para este status")
+    end
+
+    Note over G, S: Fluxo de Gestão de Operações (RF03)
+    G->>S: buscarPedidos(filtro: status)
+    S-->>G: listaDePedidos[]
+
+    G->>S: atualizarStatus(id, "ENVIADO")
+    S-->>S: validarTransicaoStatus(id, "ENVIADO")
+    S-->>G: statusAtualizado(id, "ENVIADO")

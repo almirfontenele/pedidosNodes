@@ -1,39 +1,27 @@
-# --- Estágio 1: Build & Dependencies ---
+# Estágio de Build
 FROM node:18-alpine AS build
 
-# Define o diretório de trabalho
 WORKDIR /usr/src/app
 
-# Copia apenas os arquivos de dependências primeiro (otimiza cache de camadas)
 COPY package*.json ./
+# Instalamos tudo para garantir que o ts-node e o typescript estejam presentes
+RUN npm install
 
-# Instala apenas as dependências necessárias, evitando scripts maliciosos e limpando cache
-RUN npm ci --only=production && npm cache clean --force
-
-# Copia o resto do código
 COPY . .
 
-# --- Estágio 2: Produção ---
+# Estágio de Runner
 FROM node:18-alpine AS runner
-
-# Define variável de ambiente para produção
-ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
 
-# Copia apenas o que é estritamente necessário do estágio de build
-COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/package*.json ./
-COPY --from=build /usr/src/app ./ 
+ENV NODE_ENV=production
 
-# Segurança: Muda o dono da pasta para o usuário não-root 'node'
-RUN chown -R node:node /usr/src/app
+# Copiamos tudo do build (necessário para o ts-node rodar os .ts)
+COPY --from=build /usr/src/app ./
 
-# Switch para o usuário sem privilégios
-USER node
-
-# Porta da API
+# Expondo a porta da API
 EXPOSE 3000
 
-# Execução direta do node (evita o npm como PID 1 para lidar melhor com sinais do SO)
-CMD [ "node", "index.js" ]
+# Comando para rodar usando ts-node apontando para o seu arquivo real
+# Note que usamos o executável do node_modules
+CMD [ "./node_modules/.bin/ts-node", "src/index.ts" ]
